@@ -63,22 +63,25 @@ const FRAG = /* glsl */`
       float waveDist   = dist - waveRadius;
       float fade       = exp(-age * u_fadeRate);
 
-      float halfThick  = 0.10;
-      float band = smoothstep(-halfThick * 2.8, -halfThick * 0.15, waveDist)
-                 * (1.0 - smoothstep(halfThick * 0.15, halfThick * 2.8, waveDist));
+      /* Thin soft band — 4× narrower than the QR ripple.
+       * Outer smoothstep is wide (×6) so the falloff is very gradual,
+       * giving a feathered halo rather than a hard ring edge. */
+      float halfThick = 0.035;
+      float band = smoothstep(-halfThick * 6.0, -halfThick * 0.5, waveDist)
+                 * (1.0 - smoothstep(halfThick * 0.5, halfThick * 6.0, waveDist));
 
+      /* Very light vibration — just enough to keep the ring alive,
+       * not enough to look electric or jagged. */
       float angle = atan(diff.y, diff.x * u_aspect);
-      float v1 = sin(dist * u_frequency        - u_time * 9.0);
-      float v2 = sin(dist * u_frequency * 1.37 - u_time * 14.0) * 0.65;
-      float v3 = sin(dist * u_frequency * 0.61 + angle * 5.0 - u_time * 6.5) * 0.60;
-      float v4 = sin(dist * u_frequency * 2.10 - angle * 3.0 - u_time * 18.0) * 0.35;
-      float vibration = (v1 + v2 + v3 + v4) / 2.6;
+      float v1 = sin(dist * u_frequency - u_time * 6.0);
+      float v2 = sin(dist * u_frequency * 0.55 + angle * 3.0 - u_time * 4.0) * 0.4;
+      float vibration = (v1 + v2) * 0.12; // heavily damped — smooth ring
 
-      float core    = 1.0 - smoothstep(0.0, halfThick * 0.50, abs(waveDist));
-      core          = core * core;
-      float glowMod = abs(vibration) * 0.5 + 0.5;
+      float core    = 1.0 - smoothstep(0.0, halfThick * 0.8, abs(waveDist));
+      core          = core * core * 0.5;
+      float glowMod = abs(vibration) * 0.4 + 0.8; // stays near 0.8 — nearly uniform
 
-      glow += (band * glowMod * 0.55 + core * 1.1) * fade;
+      glow += (band * glowMod * 0.45 + core) * fade;
     }
 
     float g = clamp(glow * u_glowGain, 0.0, 1.0);
@@ -201,11 +204,11 @@ export function CardRipple({
     const uAspect    = gl.getUniformLocation(prog, "u_aspect");
 
     /* Static uniforms */
-    gl.uniform1f(gl.getUniformLocation(prog, "u_frequency"), 24.0);
-    gl.uniform1f(gl.getUniformLocation(prog, "u_speed"),      0.60);
-    gl.uniform1f(gl.getUniformLocation(prog, "u_easeK"),      3.5);
-    gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.95);
-    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   2.0);
+    gl.uniform1f(gl.getUniformLocation(prog, "u_frequency"),  7.0);  // few smooth cycles
+    gl.uniform1f(gl.getUniformLocation(prog, "u_speed"),      2.2);  // reaches far card corners
+    gl.uniform1f(gl.getUniformLocation(prog, "u_easeK"),      1.6);  // gentle ease-out
+    gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.38); // slow, soft fade (~2.5s)
+    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.6);  // barely-there luminance
 
     /* Aspect ratio = width / height (physical pixels) */
     gl.uniform1f(uAspect, canvas.width / canvas.height);
@@ -233,8 +236,8 @@ export function CardRipple({
         if (ripplesRef.current.length > MAX_RIPPLES) ripplesRef.current.shift();
       }
 
-      /* Expire old ripples (2s lifetime) */
-      ripplesRef.current = ripplesRef.current.filter(r => t - r.startTime < 2.0);
+      /* Expire old ripples — lifetime matches the gentle fadeRate=0.38 */
+      ripplesRef.current = ripplesRef.current.filter(r => t - r.startTime < 3.5);
 
       if (ripplesRef.current.length === 0) { stopLoop(); return; }
 
