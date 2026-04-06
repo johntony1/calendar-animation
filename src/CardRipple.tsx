@@ -63,11 +63,11 @@ const FRAG = /* glsl */`
       float waveDist   = dist - waveRadius;
       float fade       = exp(-age * u_fadeRate);
 
-      /* Big soft ring — wide half-thickness with gentle ±3.5× smoothstep
-       * falloff so the ring has a feathered halo on both sides. */
-      float halfThick = 0.09;
-      float band = smoothstep(-halfThick * 3.5, -halfThick * 0.4, waveDist)
-                 * (1.0 - smoothstep(halfThick * 0.4, halfThick * 3.5, waveDist));
+      /* Very thick ring — wide halfThick + ±4.0× smoothstep so it's a
+       * massive soft wash of color, not a defined ring edge. */
+      float halfThick = 0.18;
+      float band = smoothstep(-halfThick * 4.0, -halfThick * 0.3, waveDist)
+                 * (1.0 - smoothstep(halfThick * 0.3, halfThick * 4.0, waveDist));
 
       /* Very light vibration — barely perceptible shimmer, not electric. */
       float angle = atan(diff.y, diff.x * u_aspect);
@@ -118,7 +118,7 @@ interface Ripple { x: number; y: number; startTime: number; }
 
 export function CardRipple({
   trigger,
-  glowColor = "#bfdbfe",  // Tailwind blue-200 — very soft pastel blue
+  glowColor = "#bbf7d0",  // Tailwind green-200 — very pale green, nearly invisible on white
 }: {
   trigger:    RippleTrigger;
   glowColor?: string;
@@ -206,7 +206,7 @@ export function CardRipple({
     gl.uniform1f(gl.getUniformLocation(prog, "u_speed"),      2.2);  // reaches far card corners
     gl.uniform1f(gl.getUniformLocation(prog, "u_easeK"),      1.6);  // gentle ease-out
     gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.38); // slow, soft fade (~2.5s)
-    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.32); // very soft — let color carry it
+    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.18); // near-invisible — blends with bg
 
     /* Aspect ratio = width / height (physical pixels) */
     gl.uniform1f(uAspect, canvas.width / canvas.height);
