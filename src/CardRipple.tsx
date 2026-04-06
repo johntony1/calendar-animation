@@ -83,8 +83,11 @@ const FRAG = /* glsl */`
     }
 
     float g = clamp(glow * u_glowGain, 0.0, 1.0);
-    /* Straight (non-premultiplied) alpha — blended with SRC_ALPHA / ONE_MINUS_SRC_ALPHA */
-    gl_FragColor = vec4(u_glowColor * g, g);
+    /* Non-premultiplied: color and alpha are separate.
+     * Blend func SRC_ALPHA/ONE_MINUS_SRC_ALPHA computes:
+     *   result = g × glowColor + (1-g) × background
+     * Outputting vec4(glowColor * g, g) would square g → dark. */
+    gl_FragColor = vec4(u_glowColor, g);
   }
 `;
 
@@ -99,12 +102,11 @@ function compileShader(gl: WebGLRenderingContext, type: number, src: string): We
 }
 
 function hexToGlowRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max   = Math.max(r, g, b, 0.001);
-  const scale = 1.2 / max;
-  return [r * scale, g * scale, b * scale];
+  return [
+    parseInt(hex.slice(1, 3), 16) / 255,
+    parseInt(hex.slice(3, 5), 16) / 255,
+    parseInt(hex.slice(5, 7), 16) / 255,
+  ];
 }
 
 /* ─── Public interface ──────────────────────────────────── */
