@@ -76,10 +76,10 @@ const FRAG = /* glsl */`
       float vibration = (v1 + v2) * 0.10;
 
       float core    = 1.0 - smoothstep(0.0, halfThick * 0.6, abs(waveDist));
-      core          = core * core * 0.4;
-      float glowMod = abs(vibration) * 0.3 + 0.85;
+      core          = core * core * 0.18;
+      float glowMod = abs(vibration) * 0.2 + 0.75;
 
-      glow += (band * glowMod * 0.42 + core) * fade;
+      glow += (band * glowMod * 0.70 + core) * fade;
     }
 
     float g = clamp(glow * u_glowGain, 0.0, 1.0);
@@ -120,7 +120,7 @@ interface Ripple { x: number; y: number; startTime: number; }
 
 export function CardRipple({
   trigger,
-  glowColor = "#4ade80",  // Tailwind green-400 — visible soft green
+  glowColor = "#E3F7EC",  // soft mint green
 }: {
   trigger:    RippleTrigger;
   glowColor?: string;
@@ -163,8 +163,11 @@ export function CardRipple({
     if (!gl) return;
 
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    /* No WebGL blending — shader computes all ripples in one pass.
+     * Blending onto transparent-black dest multiplies RGB by g, then the
+     * browser compositor multiplies by alpha again → g³ → near-black.
+     * Straight framebuffer output + premultipliedAlpha:false lets the
+     * browser compositor do: g × color + (1-g) × card  correctly. */
 
     /* Compile program */
     const vert = compileShader(gl, gl.VERTEX_SHADER,   VERT);
@@ -207,8 +210,8 @@ export function CardRipple({
     gl.uniform1f(gl.getUniformLocation(prog, "u_frequency"),  7.0);  // few smooth cycles
     gl.uniform1f(gl.getUniformLocation(prog, "u_speed"),      2.2);  // reaches far card corners
     gl.uniform1f(gl.getUniformLocation(prog, "u_easeK"),      1.6);  // gentle ease-out
-    gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.38); // slow, soft fade (~2.5s)
-    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.55); // visible but soft
+    gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.55); // faster fade — lighter feel
+    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.60);
 
     /* Aspect ratio = width / height (physical pixels) */
     gl.uniform1f(uAspect, canvas.width / canvas.height);

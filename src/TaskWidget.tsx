@@ -25,7 +25,7 @@
  * ───────────────────────────────────────────────────────── */
 
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import type React from "react";
 import CalendarExpanded from "./CalendarExpanded";
 import GuestsExpanded from "./GuestsExpanded";
@@ -115,27 +115,90 @@ function AvatarStack({ onClick, triggerRef }: {
 }
 
 // ─── Checkbox ────────────────────────────────────────────
-const GREEN = "#22c55e";
+const GREEN        = "#22c55e";
 const SPRING_FILL  = { type: "spring" as const, stiffness: 420, damping: 22, bounce: 0.35 };
 const SPRING_MARK  = { type: "spring" as const, stiffness: 380, damping: 24 };
 const RING_EASE    = [0.22, 1, 0.36, 1] as const;
+const BURST_EASE   = [0.22, 1, 0.36, 1] as const;
+const BURST_EMOJIS = ["✨", "⭐", "💫", "🌟", "🎉", "✨", "💥", "🌟"];
+const N_PARTICLES  = 8;
+
+function makeParticles() {
+  return Array.from({ length: N_PARTICLES }, (_, i) => {
+    const angle = (i / N_PARTICLES) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const dist  = 30 + Math.random() * 22;
+    return {
+      emoji:  BURST_EMOJIS[i % BURST_EMOJIS.length],
+      x:      Math.cos(angle) * dist,
+      y:      Math.sin(angle) * dist,
+      size:   10 + Math.random() * 6,
+      rotate: (Math.random() - 0.5) * 80,
+      delay:  i * 0.018 + Math.random() * 0.025,
+    };
+  });
+}
+
+/* ─── CheckboxBurst ──────────────────────────────────── */
+function CheckboxBurst({ burstId }: { burstId: number }) {
+  const particles = useMemo(makeParticles, [burstId]);
+  return (
+    <>
+      {particles.map((p, i) => (
+        <motion.span
+          key={i}
+          className="absolute pointer-events-none select-none"
+          style={{
+            fontSize:   p.size,
+            lineHeight: 1,
+            top:        "50%",
+            left:       "50%",
+            marginTop:  -(p.size / 2),
+            marginLeft: -(p.size / 2),
+            zIndex:     20,
+          }}
+          initial={{ x: 0, y: 0, scale: 0.2, opacity: 1, rotate: 0 }}
+          animate={{
+            x:       p.x,
+            y:       p.y,
+            scale:   [0.2, 1.2, 0],
+            opacity: [1,   1,   0],
+            rotate:  p.rotate,
+          }}
+          transition={{
+            x:       { duration: 0.58, ease: BURST_EASE, delay: p.delay },
+            y:       { duration: 0.58, ease: BURST_EASE, delay: p.delay },
+            rotate:  { duration: 0.58, ease: BURST_EASE, delay: p.delay },
+            scale:   { duration: 0.58, ease: BURST_EASE, delay: p.delay, times: [0, 0.25, 1] },
+            opacity: { duration: 0.58, ease: "easeIn",   delay: p.delay, times: [0, 0.5,  1] },
+          }}
+        >
+          {p.emoji}
+        </motion.span>
+      ))}
+    </>
+  );
+}
 
 function Checkbox({ checked, onToggle }: {
   checked:  boolean;
   onToggle: (e: React.MouseEvent) => void;
 }) {
-  const [hovered,  setHovered]  = useState(false);
-  const [showRing, setShowRing] = useState(false);
-  const [ringId,   setRingId]   = useState(0);
+  const [hovered,    setHovered]    = useState(false);
+  const [showRing,   setShowRing]   = useState(false);
+  const [ringId,     setRingId]     = useState(0);
+  const [showBurst,  setShowBurst]  = useState(false);
+  const [burstId,    setBurstId]    = useState(0);
   const prevRef = useRef(false);
   const reduced = useReducedMotion();
 
-  /* Fire ring only on unchecked → checked transition */
+  /* Fire ring + burst only on unchecked → checked transition */
   useEffect(() => {
     if (checked && !prevRef.current && !reduced) {
       setRingId((n) => n + 1);
       setShowRing(true);
-      const t = setTimeout(() => setShowRing(false), 700);
+      setBurstId((n) => n + 1);
+      setShowBurst(true);
+      const t = setTimeout(() => { setShowRing(false); setShowBurst(false); }, 750);
       return () => clearTimeout(t);
     }
     prevRef.current = checked;
@@ -181,6 +244,11 @@ function Checkbox({ checked, onToggle }: {
             transition={{ duration: 0.62, ease: RING_EASE }}
           />
         )}
+      </AnimatePresence>
+
+      {/* Particle burst — fires on check, radiates outward, auto-unmounts */}
+      <AnimatePresence>
+        {showBurst && <CheckboxBurst key={burstId} burstId={burstId} />}
       </AnimatePresence>
 
       {/* Checkmark — path draw springs in, then bounces to scale 1 */}
