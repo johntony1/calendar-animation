@@ -29,6 +29,7 @@ import { useRef, useState, useEffect } from "react";
 import type React from "react";
 import CalendarExpanded from "./CalendarExpanded";
 import GuestsExpanded from "./GuestsExpanded";
+import { CardRipple, computeRippleUV, type RippleTrigger } from "./CardRipple";
 
 import avatar1 from "./assets/avatar1.png";
 import avatar2 from "./assets/avatar2.png";
@@ -114,7 +115,10 @@ function AvatarStack({ onClick, triggerRef }: {
 }
 
 // ─── Checkbox ────────────────────────────────────────────
-function Checkbox({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
+function Checkbox({ checked, onToggle }: {
+  checked:  boolean;
+  onToggle: (e: React.MouseEvent) => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const reduced = useReducedMotion();
 
@@ -157,7 +161,12 @@ function Checkbox({ checked, onToggle }: { checked: boolean; onToggle: () => voi
 }
 
 // ─── TaskRow ─────────────────────────────────────────────
-function TaskRow({ label, time, delayS }: { label: string; time: string; delayS: number }) {
+function TaskRow({ label, time, delayS, onRipple }: {
+  label:    string;
+  time:     string;
+  delayS:   number;
+  onRipple: (e: React.MouseEvent) => void;
+}) {
   const [checked, setChecked] = useState(false);
   const [hovered, setHovered] = useState(false);
   const reduced = useReducedMotion();
@@ -177,7 +186,10 @@ function TaskRow({ label, time, delayS }: { label: string; time: string; delayS:
       transition={reduced ? { duration: 0.15 } : { ...SPRING_ENTRY, delay: delayS }}
     >
       <div className="flex items-center gap-2 min-h-px min-w-px" style={{ flex: "1 0 0" }}>
-        <Checkbox checked={checked} onToggle={() => setChecked((v) => !v)} />
+        <Checkbox
+          checked={checked}
+          onToggle={(e) => { setChecked((v) => !v); onRipple(e); }}
+        />
 
         {/* Label + animated strikethrough line */}
         <div className="relative shrink-0">
@@ -216,6 +228,15 @@ function TaskRow({ label, time, delayS }: { label: string; time: string; delayS:
 export default function TaskWidget() {
   const [view, setView] = useState<View>("closed");
   const reduced = useReducedMotion();
+
+  // Ripple state for the task card
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [ripple, setRipple] = useState<RippleTrigger>({ x: 0.5, y: 0.5, key: 0 });
+  function fireRipple(e: React.MouseEvent) {
+    const uv = computeRippleUV(e, cardRef.current);
+    if (!uv) return;
+    setRipple(prev => ({ ...uv, key: prev.key + 1 }));
+  }
 
   // Focus refs — calendar and guests each have their own trigger + close button
   const calendarTriggerRef = useRef<HTMLButtonElement>(null);
@@ -288,7 +309,7 @@ export default function TaskWidget() {
                   ref={calendarTriggerRef}
                   onClick={() => setView("calendar")}
                   aria-label="Open calendar"
-                  aria-expanded={view === "calendar"}
+                  aria-expanded={false}
                   aria-haspopup="dialog"
                   className="flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-[#c0d5ff] rounded-[4px]"
                   whileHover={reduced ? {} : { scale: 1.1 }}
@@ -306,6 +327,7 @@ export default function TaskWidget() {
 
             {/* Task card */}
             <motion.div
+              ref={cardRef}
               className="relative flex flex-col gap-2 px-3 py-3 shrink-0 w-full overflow-hidden"
               style={{
                 borderRadius: "16px 16px 20px 20px",
@@ -322,8 +344,10 @@ export default function TaskWidget() {
             >
               {TASKS.map((task, i) => (
                 <TaskRow key={task.id} label={task.label} time={task.time}
-                  delayS={0.26 + i * 0.07} />
+                  delayS={0.26 + i * 0.07} onRipple={fireRipple} />
               ))}
+              {/* WebGL glow ripple — fires from checkbox click position */}
+              <CardRipple trigger={ripple} glowColor="#2d9cff" />
               {/* inner bottom vignette */}
               <div className="absolute inset-0 pointer-events-none"
                 style={{ borderRadius: "inherit",

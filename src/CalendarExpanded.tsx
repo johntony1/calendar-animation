@@ -19,6 +19,8 @@
 
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useRef, useState, type RefObject } from "react";
+import type React from "react";
+import { CardRipple, computeRippleUV, type RippleTrigger } from "./CardRipple";
 import arrowLeftSrc   from "./assets/arrow-left.svg";
 import arrowRightSrc  from "./assets/arrow-right.svg";
 import chevronDownSrc from "./assets/chevron-down.svg";
@@ -214,7 +216,7 @@ function NavArrow({ src, alt, onClick }: { src: string; alt: string; onClick: ()
 }
 
 // ─── CheckboxExpanded (uses #d1d1d1 outer bg) ───────────
-function CheckboxExpanded() {
+function CheckboxExpanded({ onToggle }: { onToggle: (e: React.MouseEvent) => void }) {
   const [checked, setChecked] = useState(false);
   const [hovered, setHovered] = useState(false);
   const reduced = useReducedMotion();
@@ -223,7 +225,7 @@ function CheckboxExpanded() {
     <motion.button
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => setChecked((v) => !v)}
+      onClick={(e) => { setChecked((v) => !v); onToggle(e); }}
       aria-label={checked ? "Mark incomplete" : "Mark complete"}
       className="relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-1
         focus-visible:ring-[#c0d5ff] rounded-[4px]"
@@ -263,9 +265,18 @@ export default function CalendarExpanded({ onClose, closeButtonRef }: CalendarEx
   const [selectedDay, setSelectedDay] = useState(TODAY_KEY);
   const [weekOffset, setWeekOffset]   = useState(0);
   const [activeTab, setActiveTab]     = useState<Tab>("Home");
-  const taskDirectionRef = useRef(1); // 1 = right, -1 = left (drives task list animation)
-  const dayDirectionRef  = useRef(1); // 1 = forward, -1 = back (drives week-picker slide)
+  const taskDirectionRef = useRef(1);
+  const dayDirectionRef  = useRef(1);
   const reduced = useReducedMotion();
+
+  // Ripple state for the task section card
+  const taskSectionRef = useRef<HTMLDivElement>(null);
+  const [ripple, setRipple] = useState<RippleTrigger>({ x: 0.5, y: 0.5, key: 0 });
+  function fireRipple(e: React.MouseEvent) {
+    const uv = computeRippleUV(e, taskSectionRef.current);
+    if (!uv) return;
+    setRipple(prev => ({ ...uv, key: prev.key + 1 }));
+  }
 
   const weekDays   = getWeekDays(weekOffset);
   const middleDay  = weekDays[2];
@@ -413,6 +424,7 @@ export default function CalendarExpanded({ onClose, closeButtonRef }: CalendarEx
 
       {/* ── Tasks section ──────────────────────────── */}
       <motion.div
+        ref={taskSectionRef}
         className="flex flex-col gap-2 shrink-0 w-full rounded-[16px] py-2"
         style={{ background: "#ebebeb", overflow: "hidden", position: "relative" }}
         initial={{ opacity: 0, y: reduced ? 0 : 8 }}
@@ -443,7 +455,7 @@ export default function CalendarExpanded({ onClose, closeButtonRef }: CalendarEx
               <div key={task.id} className="flex items-center justify-between px-[8px] w-full">
                 {/* Left: flex-[1_0_0] — grows, never shrinks */}
                 <div className="flex items-center gap-[8px] min-h-px min-w-px" style={{ flex: "1 0 0" }}>
-                  <CheckboxExpanded />
+                  <CheckboxExpanded onToggle={fireRipple} />
                   <div className="flex items-center gap-[4px] min-h-px min-w-px" style={{ flex: "1 0 0" }}>
                     <p className="font-medium text-[14px] leading-[20px] tracking-[-0.084px] text-[#171717] whitespace-nowrap shrink-0 select-none"
                       style={{ fontFeatureSettings: "'ss11', 'calt' 0" }}>
@@ -463,6 +475,8 @@ export default function CalendarExpanded({ onClose, closeButtonRef }: CalendarEx
             ))}
           </motion.div>
         </AnimatePresence>
+        {/* WebGL glow ripple — fires from checkbox click position */}
+        <CardRipple trigger={ripple} glowColor="#2d9cff" />
       </motion.div>
 
       {/* ── Segmented control ──────────────────────── */}
