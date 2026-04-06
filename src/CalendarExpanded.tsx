@@ -18,7 +18,7 @@
  * ───────────────────────────────────────────────────────── */
 
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { useRef, useState, type RefObject } from "react";
+import { useRef, useState, useEffect, type RefObject } from "react";
 import type React from "react";
 import { CardRipple, computeRippleUV, type RippleTrigger } from "./CardRipple";
 import arrowLeftSrc   from "./assets/arrow-left.svg";
@@ -215,11 +215,29 @@ function NavArrow({ src, alt, onClick }: { src: string; alt: string; onClick: ()
   );
 }
 
-// ─── CheckboxExpanded (uses #d1d1d1 outer bg) ───────────
+// ─── CheckboxExpanded — same green animation as Checkbox ─
+const GREEN_EXP   = "#22c55e";
+const SPRING_FILL_EXP = { type: "spring" as const, stiffness: 420, damping: 22, bounce: 0.35 };
+const SPRING_MARK_EXP = { type: "spring" as const, stiffness: 380, damping: 24 };
+const RING_EASE_EXP   = [0.22, 1, 0.36, 1] as const;
+
 function CheckboxExpanded({ onToggle }: { onToggle: (e: React.MouseEvent) => void }) {
-  const [checked, setChecked] = useState(false);
-  const [hovered, setHovered] = useState(false);
+  const [checked,  setChecked]  = useState(false);
+  const [hovered,  setHovered]  = useState(false);
+  const [showRing, setShowRing] = useState(false);
+  const [ringId,   setRingId]   = useState(0);
+  const prevRef = useRef(false);
   const reduced = useReducedMotion();
+
+  useEffect(() => {
+    if (checked && !prevRef.current && !reduced) {
+      setRingId((n) => n + 1);
+      setShowRing(true);
+      const t = setTimeout(() => setShowRing(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevRef.current = checked;
+  }, [checked, reduced]);
 
   return (
     <motion.button
@@ -230,26 +248,66 @@ function CheckboxExpanded({ onToggle }: { onToggle: (e: React.MouseEvent) => voi
       className="relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-1
         focus-visible:ring-[#c0d5ff] rounded-[4px]"
       style={{ width: 20, height: 20 }}
-      whileTap={reduced ? {} : { scale: 0.88 }}
+      whileTap={reduced ? {} : { scale: 0.95 }}
       transition={SPRING_PRESS}
     >
+      {/* Unchecked background — slightly darker grey for the card context */}
       <div className="absolute rounded-[4px]"
-        style={{ inset: "10%", background: checked ? "#171717" : hovered ? "#bdbdbd" : "#d1d1d1",
-          transition: "background 120ms ease" }} />
-      <motion.div className="absolute rounded-[2.5px]"
-        style={{ inset: "17.5%", background: "white" }}
-        animate={{ opacity: checked ? 0 : 1 }}
-        transition={{ duration: 0.12 }} />
-      <motion.svg className="absolute pointer-events-none"
-        style={{ inset: 0, width: "100%", height: "100%" }}
-        viewBox="0 0 20 20" fill="none" initial={false} animate={checked ? "on" : "off"}>
-        <motion.path d="M5.5 10.5L8.5 13.5L14.5 7"
+        style={{ inset: "10%",
+          background: checked ? "transparent" : hovered ? "#bdbdbd" : "#d1d1d1",
+          transition: "background 120ms ease" }}
+      />
+
+      {/* Green fill */}
+      <motion.div
+        className="absolute rounded-[4px]"
+        style={{ inset: "10%", background: GREEN_EXP, transformOrigin: "center" }}
+        initial={false}
+        animate={{ scale: checked ? 1 : 0 }}
+        transition={reduced ? { duration: 0.08 } : SPRING_FILL_EXP}
+      />
+
+      {/* Expanding ring */}
+      <AnimatePresence>
+        {showRing && (
+          <motion.div
+            key={ringId}
+            className="absolute rounded-[4px] pointer-events-none"
+            style={{ inset: "10%", border: `1.5px solid ${GREEN_EXP}`, transformOrigin: "center" }}
+            initial={{ scale: 0.85, opacity: 0.5 }}
+            animate={{ scale: 2.8,  opacity: 0  }}
+            exit={{}}
+            transition={{ duration: 0.62, ease: RING_EASE_EXP }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Checkmark */}
+      <motion.svg
+        className="absolute pointer-events-none"
+        style={{ inset: 0, width: "100%", height: "100%", overflow: "visible" }}
+        viewBox="0 0 20 20" fill="none" initial={false}
+      >
+        <motion.path
+          d="M5.5 10.5L8.5 13.5L14.5 7"
           stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-          variants={{
-            off: { pathLength: 0, opacity: 0 },
-            on:  { pathLength: 1, opacity: 1,
-              transition: reduced ? { duration: 0.1 } : SPRING_CHECK },
-          }} />
+          style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          initial={false}
+          animate={
+            checked
+              ? { pathLength: 1, opacity: 1, scale: 1 }
+              : { pathLength: 0, opacity: 0, scale: 0.6 }
+          }
+          transition={
+            reduced
+              ? { duration: 0.1 }
+              : checked
+              ? { pathLength: SPRING_MARK_EXP,
+                  opacity:    { duration: 0.06 },
+                  scale:      { type: "spring", stiffness: 360, damping: 20, delay: 0.05 } }
+              : { duration: 0.1, ease: "easeIn" }
+          }
+        />
       </motion.svg>
     </motion.button>
   );
@@ -476,7 +534,7 @@ export default function CalendarExpanded({ onClose, closeButtonRef }: CalendarEx
           </motion.div>
         </AnimatePresence>
         {/* WebGL glow ripple — fires from checkbox click position */}
-        <CardRipple trigger={ripple} glowColor="#2d9cff" />
+        <CardRipple trigger={ripple} />
       </motion.div>
 
       {/* ── Segmented control ──────────────────────── */}

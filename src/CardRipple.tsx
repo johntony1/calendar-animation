@@ -63,25 +63,23 @@ const FRAG = /* glsl */`
       float waveDist   = dist - waveRadius;
       float fade       = exp(-age * u_fadeRate);
 
-      /* Thin soft band — 4× narrower than the QR ripple.
-       * Outer smoothstep is wide (×6) so the falloff is very gradual,
-       * giving a feathered halo rather than a hard ring edge. */
-      float halfThick = 0.035;
-      float band = smoothstep(-halfThick * 6.0, -halfThick * 0.5, waveDist)
-                 * (1.0 - smoothstep(halfThick * 0.5, halfThick * 6.0, waveDist));
+      /* Big soft ring — wide half-thickness with gentle ±3.5× smoothstep
+       * falloff so the ring has a feathered halo on both sides. */
+      float halfThick = 0.09;
+      float band = smoothstep(-halfThick * 3.5, -halfThick * 0.4, waveDist)
+                 * (1.0 - smoothstep(halfThick * 0.4, halfThick * 3.5, waveDist));
 
-      /* Very light vibration — just enough to keep the ring alive,
-       * not enough to look electric or jagged. */
+      /* Very light vibration — barely perceptible shimmer, not electric. */
       float angle = atan(diff.y, diff.x * u_aspect);
       float v1 = sin(dist * u_frequency - u_time * 6.0);
       float v2 = sin(dist * u_frequency * 0.55 + angle * 3.0 - u_time * 4.0) * 0.4;
-      float vibration = (v1 + v2) * 0.12; // heavily damped — smooth ring
+      float vibration = (v1 + v2) * 0.10;
 
-      float core    = 1.0 - smoothstep(0.0, halfThick * 0.8, abs(waveDist));
-      core          = core * core * 0.5;
-      float glowMod = abs(vibration) * 0.4 + 0.8; // stays near 0.8 — nearly uniform
+      float core    = 1.0 - smoothstep(0.0, halfThick * 0.6, abs(waveDist));
+      core          = core * core * 0.4;
+      float glowMod = abs(vibration) * 0.3 + 0.85;
 
-      glow += (band * glowMod * 0.45 + core) * fade;
+      glow += (band * glowMod * 0.42 + core) * fade;
     }
 
     float g = clamp(glow * u_glowGain, 0.0, 1.0);
@@ -120,7 +118,7 @@ interface Ripple { x: number; y: number; startTime: number; }
 
 export function CardRipple({
   trigger,
-  glowColor = "#2d9cff",
+  glowColor = "#bfdbfe",  // Tailwind blue-200 — very soft pastel blue
 }: {
   trigger:    RippleTrigger;
   glowColor?: string;
@@ -208,7 +206,7 @@ export function CardRipple({
     gl.uniform1f(gl.getUniformLocation(prog, "u_speed"),      2.2);  // reaches far card corners
     gl.uniform1f(gl.getUniformLocation(prog, "u_easeK"),      1.6);  // gentle ease-out
     gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.38); // slow, soft fade (~2.5s)
-    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.6);  // barely-there luminance
+    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.32); // very soft — let color carry it
 
     /* Aspect ratio = width / height (physical pixels) */
     gl.uniform1f(uAspect, canvas.width / canvas.height);

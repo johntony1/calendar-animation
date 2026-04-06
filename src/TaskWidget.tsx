@@ -115,12 +115,31 @@ function AvatarStack({ onClick, triggerRef }: {
 }
 
 // ─── Checkbox ────────────────────────────────────────────
+const GREEN = "#22c55e";
+const SPRING_FILL  = { type: "spring" as const, stiffness: 420, damping: 22, bounce: 0.35 };
+const SPRING_MARK  = { type: "spring" as const, stiffness: 380, damping: 24 };
+const RING_EASE    = [0.22, 1, 0.36, 1] as const;
+
 function Checkbox({ checked, onToggle }: {
   checked:  boolean;
   onToggle: (e: React.MouseEvent) => void;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [hovered,  setHovered]  = useState(false);
+  const [showRing, setShowRing] = useState(false);
+  const [ringId,   setRingId]   = useState(0);
+  const prevRef = useRef(false);
   const reduced = useReducedMotion();
+
+  /* Fire ring only on unchecked → checked transition */
+  useEffect(() => {
+    if (checked && !prevRef.current && !reduced) {
+      setRingId((n) => n + 1);
+      setShowRing(true);
+      const t = setTimeout(() => setShowRing(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevRef.current = checked;
+  }, [checked, reduced]);
 
   return (
     <motion.button
@@ -130,31 +149,66 @@ function Checkbox({ checked, onToggle }: {
       aria-label={checked ? "Mark incomplete" : "Mark complete"}
       className="relative shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[#c0d5ff] rounded-[4px]"
       style={{ width: 20, height: 20 }}
-      whileTap={reduced ? {} : { scale: 0.88 }}
+      whileTap={reduced ? {} : { scale: 0.95 }}
       transition={SPRING_PRESS}
     >
-      {/* outer bg */}
+      {/* Unchecked background — fades out as green fill arrives */}
       <div className="absolute rounded-[4px]"
-        style={{ inset: "10%", background: checked ? "#171717" : hovered ? "#d5d5d5" : "#ebebeb",
-          transition: "background 120ms ease" }} />
-      {/* inner white box */}
-      <motion.div className="absolute rounded-[2.5px]"
-        style={{ inset: "17.5%", background: "white" }}
-        animate={{ opacity: checked ? 0 : 1,
-          boxShadow: checked ? "0px 0px 0px 0px rgba(27,28,29,0)"
-            : "0px 2px 2px 0px rgba(27,28,29,0.12)" }}
-        transition={{ duration: 0.12 }} />
-      {/* checkmark (path-draw spring) */}
-      <motion.svg className="absolute pointer-events-none"
-        style={{ inset: 0, width: "100%", height: "100%" }}
-        viewBox="0 0 20 20" fill="none" initial={false} animate={checked ? "on" : "off"}>
-        <motion.path d="M5.5 10.5L8.5 13.5L14.5 7"
+        style={{ inset: "10%",
+          background: checked ? "transparent" : hovered ? "#d5d5d5" : "#ebebeb",
+          transition: "background 120ms ease" }}
+      />
+
+      {/* Green fill — springs in from scale 0, natural overshoot from bounce:0.35 */}
+      <motion.div
+        className="absolute rounded-[4px]"
+        style={{ inset: "10%", background: GREEN, transformOrigin: "center" }}
+        initial={false}
+        animate={{ scale: checked ? 1 : 0 }}
+        transition={reduced ? { duration: 0.08 } : SPRING_FILL}
+      />
+
+      {/* Expanding ring — mounts on check, plays once, unmounts */}
+      <AnimatePresence>
+        {showRing && (
+          <motion.div
+            key={ringId}
+            className="absolute rounded-[4px] pointer-events-none"
+            style={{ inset: "10%", border: `1.5px solid ${GREEN}`, transformOrigin: "center" }}
+            initial={{ scale: 0.85, opacity: 0.5 }}
+            animate={{ scale: 2.8,  opacity: 0  }}
+            exit={{}}
+            transition={{ duration: 0.62, ease: RING_EASE }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Checkmark — path draw springs in, then bounces to scale 1 */}
+      <motion.svg
+        className="absolute pointer-events-none"
+        style={{ inset: 0, width: "100%", height: "100%", overflow: "visible" }}
+        viewBox="0 0 20 20" fill="none" initial={false}
+      >
+        <motion.path
+          d="M5.5 10.5L8.5 13.5L14.5 7"
           stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-          variants={{
-            off: { pathLength: 0, opacity: 0 },
-            on:  { pathLength: 1, opacity: 1,
-              transition: reduced ? { duration: 0.1 } : SPRING_CHECK },
-          }} />
+          style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          initial={false}
+          animate={
+            checked
+              ? { pathLength: 1, opacity: 1, scale: 1 }
+              : { pathLength: 0, opacity: 0, scale: 0.6 }
+          }
+          transition={
+            reduced
+              ? { duration: 0.1 }
+              : checked
+              ? { pathLength: SPRING_MARK,
+                  opacity:    { duration: 0.06 },
+                  scale:      { type: "spring", stiffness: 360, damping: 20, delay: 0.05 } }
+              : { duration: 0.1, ease: "easeIn" }
+          }
+        />
       </motion.svg>
     </motion.button>
   );
@@ -347,7 +401,7 @@ export default function TaskWidget() {
                   delayS={0.26 + i * 0.07} onRipple={fireRipple} />
               ))}
               {/* WebGL glow ripple — fires from checkbox click position */}
-              <CardRipple trigger={ripple} glowColor="#2d9cff" />
+              <CardRipple trigger={ripple} />
               {/* inner bottom vignette */}
               <div className="absolute inset-0 pointer-events-none"
                 style={{ borderRadius: "inherit",
