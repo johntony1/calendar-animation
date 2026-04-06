@@ -65,7 +65,7 @@ const FRAG = /* glsl */`
 
       /* Very thick ring — wide halfThick + ±4.0× smoothstep so it's a
        * massive soft wash of color, not a defined ring edge. */
-      float halfThick = 0.18;
+      float halfThick = 0.42;
       float band = smoothstep(-halfThick * 4.0, -halfThick * 0.3, waveDist)
                  * (1.0 - smoothstep(halfThick * 0.3, halfThick * 4.0, waveDist));
 
@@ -118,7 +118,7 @@ interface Ripple { x: number; y: number; startTime: number; }
 
 export function CardRipple({
   trigger,
-  glowColor = "#bbf7d0",  // Tailwind green-200 — very pale green, nearly invisible on white
+  glowColor = "#4ade80",  // Tailwind green-400 — visible soft green
 }: {
   trigger:    RippleTrigger;
   glowColor?: string;
@@ -206,7 +206,7 @@ export function CardRipple({
     gl.uniform1f(gl.getUniformLocation(prog, "u_speed"),      2.2);  // reaches far card corners
     gl.uniform1f(gl.getUniformLocation(prog, "u_easeK"),      1.6);  // gentle ease-out
     gl.uniform1f(gl.getUniformLocation(prog, "u_fadeRate"),   0.38); // slow, soft fade (~2.5s)
-    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.18); // near-invisible — blends with bg
+    gl.uniform1f(gl.getUniformLocation(prog, "u_glowGain"),   0.55); // visible but soft
 
     /* Aspect ratio = width / height (physical pixels) */
     gl.uniform1f(uAspect, canvas.width / canvas.height);
